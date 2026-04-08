@@ -26,8 +26,8 @@ class LicenseClient
     {
         // Split, base64-encoded, assembled at runtime
         // Changing this in vendor files breaks on every composer update
-        $s = ['aHR0cHM6Ly', '9saWNlbnNp', 'bmcubWVkcH', 'JvLmNvbQ=='];
-        return base64_decode(implode('', $s)) . '/api/v1/';
+        $s = ['aHR0cHM6Ly', '9wb3J0YWwu', 'bWVkcHJvZC', '54eXovYXBp', 'L3YxLw=='];
+        return base64_decode(implode('', $s));
     }
 
     // ── Layer 3: non-obvious env key names ──────────────────────────────
