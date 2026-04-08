@@ -141,6 +141,25 @@ class LicenseClient
         }
     }
 
+    public function ping(): void
+    {
+        try {
+            $this->http->post('ping', [
+                'json' => [
+                    'app_name'   => config('app.name', 'Unknown'),
+                    'app_url'    => config('app.url', ''),
+                    'server_ip'  => request()->server('SERVER_ADDR', gethostbyname(gethostname())),
+                    'php_version'=> PHP_VERSION,
+                    'node'       => $this->installationId() ?: null,
+                    'channel'    => $this->productSlug() ?: null,
+                ],
+                'headers' => ['Accept' => 'application/json'],
+            ]);
+        } catch (\Throwable) {
+            // Silent — ping is best-effort
+        }
+    }
+
     public function clearCache(): void
     {
         Cache::forget('ramiz_lv_' . md5($this->installationId()));
