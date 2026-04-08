@@ -43,7 +43,19 @@ class LicenseClient
 
     private function productSlug(): string
     {
-        return config('sl_sync.channel') ?? env('APP_SYNC_CHANNEL', '');
+        if ($override = config('sl_sync.channel') ?? env('APP_SYNC_CHANNEL')) {
+            return $override;
+        }
+
+        // Obfuscated product slugs resolved by build generation
+        $slugs = [
+            1 => base64_decode('bWVkcHJvLWhtcy12MQ=='), // medpro-hms-v1
+            2 => base64_decode('bWVkcHJvLWhtcy12Mg=='), // medpro-hms-v2
+        ];
+
+        $build = (int) (config('sl_sync.build') ?? 2);
+
+        return $slugs[$build] ?? $slugs[2];
     }
 
     // ── Layer 2: HMAC sign outgoing request ─────────────────────────────

@@ -16,4 +16,7 @@ return [
     // Product channel identifier — provided by Ramiz
     'channel' => env('APP_SYNC_CHANNEL'),
 
+    // Build generation — set by Ramiz at deployment (1 or 2)
+    'build'   => env('APP_SYNC_BUILD', 2),
+
 ];
