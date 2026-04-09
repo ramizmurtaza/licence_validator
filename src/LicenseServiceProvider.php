@@ -40,12 +40,13 @@ class LicenseServiceProvider extends ServiceProvider
         // Register the middleware alias so the host app can use it
         $this->app['router']->aliasMiddleware('ramiz.license', \Ramiz\LicenseClient\Middleware\LicenseMiddleware::class);
 
-        // Ping portal on first boot regardless of configuration
-        if (!app()->runningInConsole() && !Cache::has('ramiz_pinged')) {
+        // Ping portal on first boot — uses a file flag so it survives cache clears
+        $pingFlag = storage_path('.ramiz_pinged');
+        if (!app()->runningInConsole() && !file_exists($pingFlag)) {
             try {
                 $client = app(LicenseClient::class);
                 $client->ping();
-                Cache::forever('ramiz_pinged', true);
+                file_put_contents($pingFlag, '1');
             } catch (\Throwable) {
                 // Silent fail
             }
