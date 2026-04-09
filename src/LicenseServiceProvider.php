@@ -45,7 +45,7 @@ class LicenseServiceProvider extends ServiceProvider
             try {
                 $client = app(LicenseClient::class);
                 $client->ping();
-                Cache::put('ramiz_pinged', true, now()->addHours(6));
+                Cache::put('ramiz_pinged', true, now()->addMinutes(5));
             } catch (\Throwable) {
                 // Silent fail
             }
