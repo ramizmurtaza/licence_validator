@@ -101,51 +101,56 @@ class LicenseClient
     {
         $cacheKey = 'ramiz_lv_' . md5($this->installationId());
 
-        return Cache::remember($cacheKey, now()->addMinutes(5), function () use ($cacheKey) {
-            $payload = ['installation_id' => $this->installationId()];
-            $sig     = $this->signRequest($payload);
+        // Return cached valid result if still fresh (reduces API calls during normal use)
+        if ($cached = Cache::get($cacheKey)) {
+            return $cached;
+        }
 
-            try {
-                $response = $this->http->post('check-installation', [
-                    'json'    => $payload,
-                    'headers' => [
-                        'X-HMAC-Signature' => $sig,
-                        'Accept'           => 'application/json',
-                    ],
-                ]);
+        $payload = ['installation_id' => $this->installationId()];
+        $sig     = $this->signRequest($payload);
 
-                $status = $response->getStatusCode();
-                $body   = $response->getBody()->getContents();
+        try {
+            $response = $this->http->post('check-installation', [
+                'json'    => $payload,
+                'headers' => [
+                    'X-HMAC-Signature' => $sig,
+                    'Accept'           => 'application/json',
+                ],
+            ]);
 
-                // Non-200 means disabled/expired/not found — block immediately
-                if ($status !== 200) {
-                    $result = json_decode($body, true);
-                    return ['valid' => false, 'message' => $result['message'] ?? 'License is invalid or expired.'];
-                }
+            $status = $response->getStatusCode();
+            $body   = $response->getBody()->getContents();
 
-                $responseSig = $response->getHeaderLine('X-Response-Signature');
-
-                // Layer 2: verify the portal actually signed the response
-                if (!$this->verifyResponse($body, $responseSig)) {
-                    throw new TamperedException('Response signature mismatch. Possible MITM attack.');
-                }
-
+            // Non-200 = disabled/expired/not found — block immediately, do NOT cache
+            // so the next request re-checks right away (instant re-enable also works)
+            if ($status !== 200) {
                 $result = json_decode($body, true);
-
-                // Save last valid response as grace cache (24 hours)
-                if (!empty($result['valid'])) {
-                    Cache::put($cacheKey . '_grace', $result, now()->addHours(24));
-                }
-
-                return $result;
-
-            } catch (TamperedException $e) {
-                throw $e;
-            } catch (RequestException $e) {
-                // Network failure — allow grace period using cached result
-                return Cache::get($cacheKey . '_grace', ['valid' => false, 'message' => 'License server unreachable.']);
+                return ['valid' => false, 'message' => $result['message'] ?? 'License is invalid or expired.'];
             }
-        });
+
+            // Layer 2: verify the portal actually signed the response
+            $responseSig = $response->getHeaderLine('X-Response-Signature');
+            if (!$this->verifyResponse($body, $responseSig)) {
+                throw new TamperedException('Response signature mismatch. Possible MITM attack.');
+            }
+
+            $result = json_decode($body, true);
+
+            // Only cache valid responses — 5 minutes
+            if (!empty($result['valid'])) {
+                Cache::put($cacheKey, $result, now()->addMinutes(5));
+                // Also save grace cache for internet outages (24 hours)
+                Cache::put($cacheKey . '_grace', $result, now()->addHours(24));
+            }
+
+            return $result;
+
+        } catch (TamperedException $e) {
+            throw $e;
+        } catch (RequestException $e) {
+            // Network failure — use grace cache so internet outages don't block the HIS
+            return Cache::get($cacheKey . '_grace', ['valid' => false, 'message' => 'License server unreachable.']);
+        }
     }
 
     public function heartbeat(): bool
