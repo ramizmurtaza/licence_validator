@@ -205,9 +205,15 @@ class LicenseClient
 
     public function ping(): bool
     {
-        try {
-            $fp = $this->fingerprint();
+        $fp       = $this->fingerprint();
+        $cacheKey = 'ramiz_pinged_' . md5($fp);
 
+        // Guard — do not ping again within 5 minutes for the same machine
+        if (Cache::has($cacheKey)) {
+            return true;
+        }
+
+        try {
             $response = $this->http->post('ping', [
                 'json' => [
                     'app_name'    => config('app.name', 'Unknown'),
@@ -221,17 +227,12 @@ class LicenseClient
                 'headers' => ['Accept' => 'application/json'],
             ]);
 
-            $body = json_decode($response->getBody()->getContents(), true);
-
-            // Cache key includes portal's tenant_id — if DB is wiped the id changes,
-            // cache key won't match next time, and we ping again automatically.
-            $portalId = $body['tenant_id'] ?? null;
-            if ($portalId) {
-                Cache::put('ramiz_pinged_' . md5($fp . $portalId), true, now()->addMinutes(5));
-            }
+            // Cache regardless of response so we don't flood the portal
+            Cache::put($cacheKey, true, now()->addMinutes(5));
 
             return true;
         } catch (\Throwable) {
+            // Network failure — don't cache, try again next request
             return false;
         }
     }
