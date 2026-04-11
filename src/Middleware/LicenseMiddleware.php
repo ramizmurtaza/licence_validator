@@ -37,6 +37,18 @@ class LicenseMiddleware
         // Make license info available to the app
         app()->instance('ramiz.license', $result);
 
+        // Expiry warning — share with all views when expiring within 7 days
+        if (!empty($result['expires_at'])) {
+            $expiresAt   = \Carbon\Carbon::parse($result['expires_at']);
+            $daysLeft    = now()->diffInDays($expiresAt, false); // false = signed (negative if past)
+            if ($daysLeft >= 0 && $daysLeft <= 7) {
+                view()->share('ramiz_expiry_warning', [
+                    'days'       => (int) $daysLeft,
+                    'expires_at' => $expiresAt->format('d M Y'),
+                ]);
+            }
+        }
+
         return $next($request);
     }
 }

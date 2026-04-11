@@ -106,7 +106,7 @@ class LicenseClient
             return $cached;
         }
 
-        $payload = ['installation_id' => $this->installationId()];
+        $payload = ['installation_id' => $this->installationId(), 'fingerprint' => $this->fingerprint()];
         $sig     = $this->signRequest($payload);
 
         try {
@@ -136,10 +136,19 @@ class LicenseClient
 
             $result = json_decode($body, true);
 
-            // Only cache valid responses — 1 minute
+            // Only cache valid responses
             if (!empty($result['valid'])) {
-                Cache::put($cacheKey, $result, now()->addMinutes(1));
-                // Also save grace cache for internet outages (24 hours)
+                // If expiry is within 5 days, do NOT cache — portal changes must reflect immediately
+                $expiringSoon = false;
+                if (!empty($result['expires_at'])) {
+                    $daysLeft     = now()->diffInDays(\Carbon\Carbon::parse($result['expires_at']), false);
+                    $expiringSoon = $daysLeft <= 5;
+                }
+
+                if (!$expiringSoon) {
+                    Cache::put($cacheKey, $result, now()->addMinutes(1));
+                }
+                // Always update grace cache so internet outages still have a fallback
                 Cache::put($cacheKey . '_grace', $result, now()->addHours(24));
             }
 
