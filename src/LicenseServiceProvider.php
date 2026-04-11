@@ -50,5 +50,19 @@ class LicenseServiceProvider extends ServiceProvider
                 // Silent fail
             }
         }
+
+        // Heartbeat on web request — fires once per hour via cache throttle
+        // Works even if Laravel scheduler / cron is not configured
+        if (!app()->runningInConsole() && !Cache::has('ramiz_heartbeat')) {
+            try {
+                $client = app(LicenseClient::class);
+                if ($client->isConfigured()) {
+                    $client->heartbeat();
+                    Cache::put('ramiz_heartbeat', true, now()->addHour());
+                }
+            } catch (\Throwable) {
+                // Silent fail
+            }
+        }
     }
 }
