@@ -136,9 +136,9 @@ class LicenseClient
 
             $result = json_decode($body, true);
 
-            // Only cache valid responses — 5 minutes
+            // Only cache valid responses — 1 minute
             if (!empty($result['valid'])) {
-                Cache::put($cacheKey, $result, now()->addMinutes(5));
+                Cache::put($cacheKey, $result, now()->addMinutes(1));
                 // Also save grace cache for internet outages (24 hours)
                 Cache::put($cacheKey . '_grace', $result, now()->addHours(24));
             }
