@@ -228,7 +228,7 @@ class LicenseClient
             ]);
 
             // Cache regardless of response so we don't flood the portal
-            Cache::put($cacheKey, true, now()->addMinutes(5));
+            Cache::put($cacheKey, true, now()->addSeconds(10));
 
             return true;
         } catch (\Throwable) {
