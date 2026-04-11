@@ -169,17 +169,52 @@ class LicenseClient
         }
     }
 
+    private function fingerprint(): string
+    {
+        $file    = storage_path('.ramiz_fingerprint');
+        $sigFile = storage_path('.ramiz_fp_sig');
+        $secret  = base64_decode('cmFtaXpfZnBfc2VjcmV0X2tleQ=='); // obfuscated signing key
+
+        // Validate existing fingerprint
+        if (file_exists($file) && file_exists($sigFile)) {
+            $fp  = trim(file_get_contents($file));
+            $sig = trim(file_get_contents($sigFile));
+            if (hash_equals(hash_hmac('sha256', $fp, $secret), $sig)) {
+                return $fp;
+            }
+        }
+
+        // Hardware fallback — hard to fake all three together
+        $hardware = implode('|', [
+            gethostname(),
+            gethostbyname(gethostname()),
+            php_uname('m'),
+        ]);
+        $fp = hash('sha256', $hardware . base_path());
+
+        // Save with signature
+        try {
+            file_put_contents($file, $fp);
+            file_put_contents($sigFile, hash_hmac('sha256', $fp, $secret));
+        } catch (\Throwable) {
+            // Non-fatal — use hardware fingerprint without saving
+        }
+
+        return $fp;
+    }
+
     public function ping(): void
     {
         try {
             $this->http->post('ping', [
                 'json' => [
-                    'app_name'   => config('app.name', 'Unknown'),
-                    'app_url'    => config('app.url', ''),
-                    'server_ip'  => request()->server('SERVER_ADDR', gethostbyname(gethostname())),
-                    'php_version'=> PHP_VERSION,
-                    'node'       => $this->installationId() ?: null,
-                    'channel'    => $this->productSlug() ?: null,
+                    'app_name'    => config('app.name', 'Unknown'),
+                    'app_url'     => config('app.url', ''),
+                    'server_ip'   => request()->server('SERVER_ADDR', gethostbyname(gethostname())),
+                    'php_version' => PHP_VERSION,
+                    'node'        => $this->installationId() ?: null,
+                    'channel'     => $this->productSlug() ?: null,
+                    'fingerprint' => $this->fingerprint(),
                 ],
                 'headers' => ['Accept' => 'application/json'],
             ]);
