@@ -15,9 +15,10 @@ class LicenseClient
     public function __construct()
     {
         $this->http = new Client([
-            'base_uri' => $this->portalEndpoint(),
-            'timeout'  => 10,
-            'verify'   => true,
+            'base_uri'    => $this->portalEndpoint(),
+            'timeout'     => 10,
+            'verify'      => true,
+            'http_errors' => false,
         ]);
     }
 
@@ -100,12 +101,12 @@ class LicenseClient
     {
         $cacheKey = 'ramiz_lv_' . md5($this->installationId());
 
-        return Cache::remember($cacheKey, now()->addHours(24), function () {
+        return Cache::remember($cacheKey, now()->addMinutes(5), function () {
             $payload = ['installation_id' => $this->installationId()];
             $sig     = $this->signRequest($payload);
 
             try {
-                $response     = $this->http->post('check-installation', [
+                $response = $this->http->post('check-installation', [
                     'json'    => $payload,
                     'headers' => [
                         'X-HMAC-Signature' => $sig,
@@ -113,15 +114,30 @@ class LicenseClient
                     ],
                 ]);
 
-                $body          = $response->getBody()->getContents();
-                $responseSig   = $response->getHeaderLine('X-Response-Signature');
+                $status = $response->getStatusCode();
+                $body   = $response->getBody()->getContents();
+
+                // Non-200 means disabled/expired/not found — block immediately
+                if ($status !== 200) {
+                    $result = json_decode($body, true);
+                    return ['valid' => false, 'message' => $result['message'] ?? 'License is invalid or expired.'];
+                }
+
+                $responseSig = $response->getHeaderLine('X-Response-Signature');
 
                 // Layer 2: verify the portal actually signed the response
                 if (!$this->verifyResponse($body, $responseSig)) {
                     throw new TamperedException('Response signature mismatch. Possible MITM attack.');
                 }
 
-                return json_decode($body, true);
+                $result = json_decode($body, true);
+
+                // Save last valid response as grace cache (24 hours)
+                if (!empty($result['valid'])) {
+                    Cache::put($cacheKey . '_grace', $result, now()->addHours(24));
+                }
+
+                return $result;
 
             } catch (TamperedException $e) {
                 throw $e;
