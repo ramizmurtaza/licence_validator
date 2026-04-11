@@ -220,6 +220,8 @@ class LicenseClient
                     'app_url'     => config('app.url', ''),
                     'server_ip'   => request()->server('SERVER_ADDR', gethostbyname(gethostname())),
                     'php_version' => PHP_VERSION,
+                    'hostname'    => gethostname(),
+                    'local_ip'    => gethostbyname(gethostname()),
                     'node'        => $this->installationId() ?: null,
                     'channel'     => $this->productSlug() ?: null,
                     'fingerprint' => $fp,
