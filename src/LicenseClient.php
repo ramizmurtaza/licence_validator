@@ -101,7 +101,7 @@ class LicenseClient
     {
         $cacheKey = 'ramiz_lv_' . md5($this->installationId());
 
-        return Cache::remember($cacheKey, now()->addMinutes(5), function () {
+        return Cache::remember($cacheKey, now()->addMinutes(5), function () use ($cacheKey) {
             $payload = ['installation_id' => $this->installationId()];
             $sig     = $this->signRequest($payload);
 
