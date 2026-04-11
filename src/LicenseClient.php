@@ -206,6 +206,8 @@ class LicenseClient
     public function ping(): bool
     {
         try {
+            $fp = $this->fingerprint();
+
             $response = $this->http->post('ping', [
                 'json' => [
                     'app_name'    => config('app.name', 'Unknown'),
@@ -214,16 +216,23 @@ class LicenseClient
                     'php_version' => PHP_VERSION,
                     'node'        => $this->installationId() ?: null,
                     'channel'     => $this->productSlug() ?: null,
-                    'fingerprint' => $this->fingerprint(),
+                    'fingerprint' => $fp,
                 ],
                 'headers' => ['Accept' => 'application/json'],
             ]);
 
             $body = json_decode($response->getBody()->getContents(), true);
-            // Only cache as "pinged" if portal already knows this machine
-            return !empty($body['known']);
+
+            // Cache key includes portal's tenant_id — if DB is wiped the id changes,
+            // cache key won't match next time, and we ping again automatically.
+            $portalId = $body['tenant_id'] ?? null;
+            if ($portalId) {
+                Cache::put('ramiz_pinged_' . md5($fp . $portalId), true, now()->addMinutes(5));
+            }
+
+            return true;
         } catch (\Throwable) {
-            return false; // network failure — ping again next request
+            return false;
         }
     }
 

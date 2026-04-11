@@ -40,15 +40,12 @@ class LicenseServiceProvider extends ServiceProvider
         // Register the middleware alias so the host app can use it
         $this->app['router']->aliasMiddleware('ramiz.license', \Ramiz\LicenseClient\Middleware\LicenseMiddleware::class);
 
-        // Ping portal on every boot — cache only if portal confirms it knows this machine.
-        // If portal DB is wiped, 'known' will be false and we ping again next request.
-        if (!app()->runningInConsole() && !Cache::has('ramiz_pinged')) {
+        // Ping portal on boot — cache key includes portal's tenant_id so if portal DB
+        // is wiped the key changes and we automatically re-ping on the next request.
+        if (!app()->runningInConsole()) {
             try {
                 $client = app(LicenseClient::class);
-                $known = $client->ping();
-                if ($known) {
-                    Cache::put('ramiz_pinged', true, now()->addMinutes(5));
-                }
+                $client->ping();
             } catch (\Throwable) {
                 // Silent fail
             }
