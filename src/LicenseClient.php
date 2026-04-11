@@ -203,10 +203,10 @@ class LicenseClient
         return $fp;
     }
 
-    public function ping(): void
+    public function ping(): bool
     {
         try {
-            $this->http->post('ping', [
+            $response = $this->http->post('ping', [
                 'json' => [
                     'app_name'    => config('app.name', 'Unknown'),
                     'app_url'     => config('app.url', ''),
@@ -218,8 +218,12 @@ class LicenseClient
                 ],
                 'headers' => ['Accept' => 'application/json'],
             ]);
+
+            $body = json_decode($response->getBody()->getContents(), true);
+            // Only cache as "pinged" if portal already knows this machine
+            return !empty($body['known']);
         } catch (\Throwable) {
-            // Silent — ping is best-effort
+            return false; // network failure — ping again next request
         }
     }
 
